@@ -1,24 +1,16 @@
 from typing import List
 from fastapi import FastAPI
-from firebase import firebase
 from pydantic import BaseModel
+import firebase_admin
+from firebase_admin import credentials, db
 
 app = FastAPI()
 
-# Configuracion de firebase
-firebaseConfig = {
-"apiKey": "AIzaSyAY41_3qeC0KAiHArv0q_nLA0YBmqd0anw",
-  "authDomain": "triodeaceleradores.firebaseapp.com",
-  "databaseURL": "https://triodeaceleradores-default-rtdb.firebaseio.com",
-  "projectId": "triodeaceleradores",
-  "storageBucket": "triodeaceleradores.firebasestorage.app",
-  "messagingSenderId": "349508741823",
-  "appId": "1:349508741823:web:eb4ca372b087a66f76740a",
-  "measurementId": "G-6BYN9N70WC"
-}
-
-# Conexion a la bd
-firebase = firebase.FirebaseApplication(firebaseConfig["databaseURL"], None)
+# Cargar las credenciales desde el archivo JSON (debes subir este archivo a tu servidor)
+cred = credentials.Certificate("triodeaceleradores-firebase-adminsdk-fbsvc-6448d15405.json")  # Nombre del archivo JSON con las credenciales
+firebase_admin.initialize_app(cred, {
+    "databaseURL": "https://triodeaceleradores-default-rtdb.firebaseio.com/"
+})
 
 # Clase para definir los datos de aceleración
 class Aceleracion(BaseModel):
@@ -38,9 +30,11 @@ class Sensores(BaseModel):
 # Añadir datos de múltiples sensores
 @app.post("/items")
 def add_items(sensores: Sensores):
+    ref = db.reference("/acelerometros/item")
     results = []
+
     for sensor in sensores.sensores:
-        result = firebase.post("/acelerometros/item", {
+        new_ref = ref.push({
             "SENSOR_ID": sensor.sensor_id,
             "ACELERACION": {
                 "X": sensor.aceleracion.x,
@@ -48,5 +42,6 @@ def add_items(sensores: Sensores):
                 "Z": sensor.aceleracion.z
             }
         })
-        results.append(result)
+        results.append({"sensor_id": sensor.sensor_id, "key": new_ref.key})
+
     return {"results": results}
